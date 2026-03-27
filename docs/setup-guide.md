@@ -97,7 +97,7 @@ to obfuscation.
 
 ### Hardware
 
-- **Android device** with USB debugging enabled (Pixel 9 Pro XL, non-rooted)
+- **Android device** with USB debugging enabled (no root necessary)
 - Device and WSL machine on the **same WiFi network** (for wireless ADB)
 
 ### Online accounts
@@ -151,8 +151,6 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-21-openjdk' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-> **Note:** Fedora 42 does not ship JDK 17. JDK 21 works fine — ReVanced requires 17+.
-
 ### 2. Install ADB
 
 ```bash
@@ -165,7 +163,7 @@ adb version   # verify
 WiFi ADB is the recommended approach for WSL2 -- it avoids all USB passthrough
 complexity (WSL2 cannot directly access USB devices).
 
-#### On the Pixel 9 Pro XL:
+#### On the Android phone:
 
 1. Go to **Settings > About Phone**
 2. Tap **Build Number** 7 times to enable Developer Options
