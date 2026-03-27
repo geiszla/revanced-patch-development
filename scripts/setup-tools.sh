@@ -96,9 +96,10 @@ ln -sf "$(basename "$SIGNER_VERSIONED")" "${SIGNER_JAR}"
 # ── Sync Gradle config files from config.sh versions ──
 log_info "Syncing Gradle dependency versions from config.sh..."
 
-WRAPPER_PROPS="${PATCHES_DIR}/gradle/wrapper/gradle-wrapper.properties"
-if [[ -f "$WRAPPER_PROPS" ]]; then
-    sed -i "s|distributionUrl=.*|distributionUrl=https\\\\://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip|" "$WRAPPER_PROPS"
+if [[ -f "${PATCHES_DIR}/gradlew" ]]; then
+    cd "${PATCHES_DIR}"
+    ./gradlew wrapper --gradle-version "${GRADLE_VERSION}" --quiet
+    cd "${PROJECT_ROOT}"
     log_ok "Gradle wrapper → ${GRADLE_VERSION}"
 fi
 

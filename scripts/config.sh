@@ -30,7 +30,7 @@ export ANDROID_HOME="${ANDROID_SDK_DIR}"
 # ── Gradle/Kotlin dependency versions ──
 # These are the source of truth. Run ./scripts/setup-tools.sh to sync them
 # into the Gradle config files automatically.
-GRADLE_VERSION="9.3.1"
+GRADLE_VERSION="9.4.1"
 PATCHER_VERSION="22.0.1"
 SMALI_VERSION="3.0.9"
 PATCHES_PLUGIN_VERSION="1.0.0-dev.11"

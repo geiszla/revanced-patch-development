@@ -51,11 +51,21 @@ structural matching (strings, opcodes, types) rather than names (which are obfus
 See `docs/setup-guide.md` for detailed examples.
 
 ## When writing patches
-- Use `firstMethodDeclaratively { }` for matching -- it's resilient to obfuscation
-- Match on `strings()`, `opcodes()`, `returnType()`, `accessFlags()` -- not class/method names
+- Declare matches at file level using `val BytecodePatchContext.myMatch by composingFirstMethod { }` (or in a separate `Matching.kt`)
+- Pass string constants as args to `composingFirstMethod("str")` for fast index-based lookup
+- Match on `returnType()`, `parameterTypes()`, `accessFlags()`, `opcodes()`, `strings()`, `instructions {}`, `custom {}` -- not class/method names
+- Use `apply { }` block inside `bytecodePatch { }` -- the older `execute { }` is deprecated
+- Access matched methods via `myMatch.method` (delegate property on `BytecodePatchContext`)
+- Access matched classes via `myMatch.classDef` (for field iteration, etc.)
+- Access instruction indices via `myMatch[0]` or `myMatch.indices` (for precise injection)
+- Use `myMatch.method.addInstructions(index, smaliCode)` to inject bytecode
+- Required imports for Matching.kt: `app.revanced.patcher.composingFirstMethod`, `app.revanced.patcher.patch.BytecodePatchContext`, plus each DSL method used (`app.revanced.patcher.accessFlags`, `.returnType`, `.parameterTypes`, `.opcodes`, `.strings`, `.custom`)
+- Required imports for patches: `app.revanced.patcher.patch.bytecodePatch`, `app.revanced.patcher.extensions.addInstructions`
+- For simple disable: use `returnEarly()` / `returnEarly(false)` utilities (see revanced-patches for examples)
 - For runtime logic, add extension code in `extensions/extension/src/main/java/`
-- Inline Smali instructions go in `addInstructions()` calls
+- Reference extensions in Smali as `Lapp/revanced/extension/instagram/ClassName;`
 - Test patches by running `./scripts/build.sh <app> && ./scripts/install.sh output/<app>-patched.apk`
+- Convention: one `Matching.kt` + one `SomePatch.kt` per feature directory
 
 ## When analyzing decompiled code
 - Decompiled Java source is in `workspace/<app>/decompiled/jadx/sources/`

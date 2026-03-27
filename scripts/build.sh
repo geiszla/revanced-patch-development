@@ -81,8 +81,13 @@ if [[ ! -d "$APK_DIR" ]]; then
     exit 1
 fi
 
-# Find the most recent APK in the directory
-APK_FILE=$(find "$APK_DIR" -maxdepth 1 -name "*.apk" -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
+# Find the APK to patch (prefer base.apk, ignore split APKs)
+if [[ -f "${APK_DIR}/base.apk" ]]; then
+    APK_FILE="${APK_DIR}/base.apk"
+else
+    # Fallback: find the first non-split APK
+    APK_FILE=$(find "$APK_DIR" -maxdepth 1 -name "*.apk" ! -name "split_*" -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
+fi
 if [[ -z "$APK_FILE" || ! -f "$APK_FILE" ]]; then
     log_err "No APK found in ${APK_DIR}/"
     exit 1
@@ -115,37 +120,21 @@ for p in "${EXCLUDE_PATCHES[@]}"; do
     CLI_ARGS+=(-d "$p")
 done
 
-CLI_ARGS+=("${APK_FILE}")
+# Copy base APK to a temp location so the CLI doesn't pick up split APKs
+TEMP_APK="${OUTPUT_DIR}/${APP_NAME}-input.apk"
+cp "$APK_FILE" "$TEMP_APK"
+
+CLI_ARGS+=(-o "${OUTPUT_APK}" "${TEMP_APK}")
 
 log_info "Applying patches with ReVanced CLI..."
 java -jar "${CLI_JAR}" "${CLI_ARGS[@]}"
+rm -f "$TEMP_APK"
 
-# Find the output (CLI puts it next to input with a suffix)
-PATCHED_CANDIDATES=("${APK_DIR}"/*-patched.apk "${APK_DIR}"/*-patched-aligned-debugSigned.apk)
-PATCHED_FILE=""
-for f in "${PATCHED_CANDIDATES[@]}"; do
-    if [[ -f "$f" ]]; then
-        PATCHED_FILE="$f"
-        break
-    fi
-done
-
-if [[ -z "$PATCHED_FILE" ]]; then
-    # Check in current directory too
-    for f in ./*-patched*.apk; do
-        if [[ -f "$f" ]]; then
-            PATCHED_FILE="$f"
-            break
-        fi
-    done
-fi
-
-if [[ -n "$PATCHED_FILE" ]]; then
-    mv "$PATCHED_FILE" "$OUTPUT_APK"
+if [[ -f "$OUTPUT_APK" ]]; then
     log_ok "Patched APK: ${OUTPUT_APK}"
 else
-    log_warn "Could not locate patched APK output. Check CLI output above."
-    log_info "The patched APK may be next to the input APK or in the current directory."
+    log_err "Patched APK not found. Check CLI output above."
+    exit 1
 fi
 
 echo ""

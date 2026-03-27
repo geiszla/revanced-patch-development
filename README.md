@@ -1,0 +1,137 @@
+# ReVanced Patch Development
+
+A development environment for writing custom [ReVanced](https://revanced.app/) patches for Android apps. Patches are written in Kotlin using the ReVanced Patcher API and applied to APKs via the ReVanced CLI.
+
+Currently targeting **Instagram**, with support for adding other apps.
+
+## Quick Start
+
+### Prerequisites
+
+- WSL2 with Fedora (or similar Linux)
+- JDK 21 (`sudo dnf install java-21-openjdk-devel`)
+- ADB (`sudo dnf install android-tools`)
+- GitHub account with `gh` CLI configured
+
+See [docs/setup-guide.md](docs/setup-guide.md) for detailed setup instructions.
+
+### Setup
+
+```bash
+# 1. Configure GitHub Packages auth (required for Gradle dependencies)
+#    Add to patches/gradle.properties:
+#    gpr.user=<username>  gpr.key=<token>
+#    githubPackagesUsername=<username>  githubPackagesPassword=<token>
+
+# 2. Download tools (JADX, APKTool, ReVanced CLI, Android SDK)
+./scripts/setup-tools.sh
+
+# 3. Verify the patches project builds
+cd patches && ./gradlew build && cd ..
+
+# 4. Connect your Android device via WiFi ADB
+adb pair <IP>:<PAIRING_PORT>      # enter 6-digit code from phone
+adb connect <IP>:<CONNECTION_PORT>
+```
+
+### Development Workflow
+
+```bash
+# Pull APK from device
+./scripts/pull-apk.sh com.instagram.android instagram
+
+# Decompile (JADX for readable Java, APKTool for resources/Smali)
+./scripts/decompile.sh workspace/instagram/apk/base.apk instagram
+
+# Write patches in patches/patches/src/main/kotlin/app/revanced/patches/instagram/
+
+# Build patches and apply to APK
+./scripts/build.sh instagram
+
+# Install on device
+./scripts/install.sh output/instagram-patched.apk
+```
+
+## Project Structure
+
+```
+patches/                    Kotlin/Gradle patches project
+  patches/src/main/kotlin/  Patch source code (one subdir per app)
+  extensions/extension/     Runtime code compiled to DEX and merged into target apps
+  gradle/libs.versions.toml Patcher + Smali version catalog
+
+workspace/<app>/            Per-app working directories
+  apk/                      Original APK files
+  decompiled/jadx/          JADX output (readable Java source + resources)
+  decompiled/apktool/       APKTool output (Smali + decoded resources)
+
+scripts/
+  config.sh                 Central version config for all tools and dependencies
+  setup-tools.sh            Download/update tools, sync Gradle versions
+  decompile.sh              Decompile APK with JADX + APKTool
+  build.sh                  Build patches and apply to APK
+  install.sh                Install patched APK on device
+  pull-apk.sh               Pull installed APK from device
+
+tools/                      Downloaded tools (gitignored)
+output/                     Patched APK output (gitignored)
+docs/setup-guide.md         Comprehensive setup and reference guide
+```
+
+## Upgrading Dependencies
+
+All versions are centralized in [`scripts/config.sh`](scripts/config.sh):
+
+```bash
+# 1. Edit versions in scripts/config.sh
+# 2. Re-run setup (downloads new tools + syncs Gradle config)
+./scripts/setup-tools.sh
+# 3. Verify
+cd patches && ./gradlew build
+```
+
+Tool versions (JADX, CLI, APKTool, Android SDK) and Gradle dependency versions (patcher, plugin, smali) are all managed from this single file.
+
+## Writing Patches
+
+Patches use the `bytecodePatch {}` Kotlin DSL with `composingFirstMethod` for locating
+methods in obfuscated code:
+
+```kotlin
+// Matching.kt — match declarations
+import app.revanced.patcher.composingFirstMethod
+import app.revanced.patcher.patch.BytecodePatchContext
+import com.android.tools.smali.dexlib2.AccessFlags
+
+// Matches are declared at file level (or in a separate Matching.kt).
+// String args are used for fast index-based lookup.
+internal val BytecodePatchContext.myMatch by composingFirstMethod(
+    "some_unique_string",
+) {
+    accessFlags(AccessFlags.PUBLIC, AccessFlags.FINAL)
+    returnType("V")
+}
+
+// MyPatch.kt — patch logic
+import app.revanced.patcher.extensions.addInstructions
+import app.revanced.patcher.patch.bytecodePatch
+
+@Suppress("unused")
+val myPatch = bytecodePatch(
+    name = "My patch",
+    description = "Does something useful.",
+) {
+    compatibleWith("com.instagram.android")
+
+    apply {
+        myMatch.method.addInstructions(0, "return-void")
+    }
+}
+```
+
+Matches use structural properties (`strings`, `opcodes`, `returnType`,
+`accessFlags`, `parameterTypes`, `instructions`, `custom`) instead of class/method
+names, making them resilient to obfuscation.
+
+See [docs/setup-guide.md](docs/setup-guide.md) for the full API reference, extensions
+system, and troubleshooting.

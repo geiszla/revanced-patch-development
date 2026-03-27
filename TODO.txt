@@ -1,0 +1,21 @@
+- Upgrade gradle version
+
+Fix if blocking reels/clips sponsored content is not working
+------------------------------------------------------------
+
+The cleaner low-fragility hook I see is not in C2DM.A0R(...) at all. It is the response-to-items converter at workspace/instagram/decompiled/jadx/sources/p000X/C58802Dk.java:76. That method is
+called from workspace/instagram/decompiled/jadx/sources/p000X/C2DM.java:1880, and the caller already tolerates an empty result. More importantly, downstream handling explicitly has an empty-list
+path at workspace/instagram/decompiled/jadx/sources/p000X/C58802Dk.java:318.
+
+Why this is a better anchor:
+
+- It can be patched at method entry, not mid-function.
+- It has a strong unique anchor string at workspace/instagram/decompiled/jadx/sources/p000X/C58802Dk.java:151: ClipsSponsoredResponseHandler.convertToClipsSponsoredContent.
+- It also has distinctive structure at workspace/instagram/decompiled/jadx/sources/p000X/C58802Dk.java:82 and workspace/instagram/decompiled/jadx/sources/p000X/C58802Dk.java:87 with
+  Collections.unmodifiableList(c29978BjL.A08) and .A0A.
+
+So if the goal is robustness, I would patch C58802Dk.A01(...) to return an empty List immediately. That avoids state-machine drift and avoids mid-function injection.
+
+The tradeoff is important: this still allows the sponsored request to go out. If you want both “no network request” and “no state-machine risk,” I do not see a similarly clean late hook inside
+C2DM.A0R(...) without adding more machinery to simulate a completed empty fetch.
+
