@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/config.sh"
+
+# Build patches and apply them to an APK.
+#
+# Usage:
+#   ./scripts/build.sh <app-name> [--patches-only] [--apply-only] [--include "Patch Name"] [--exclude "Patch Name"]
+#
+# Examples:
+#   ./scripts/build.sh instagram                          # Build + apply all compatible patches
+#   ./scripts/build.sh instagram --patches-only            # Only build the .rvp, don't apply
+#   ./scripts/build.sh instagram --include "Hide element"  # Only apply specific patch(es)
+
+APP_NAME=""
+PATCHES_ONLY=0
+APPLY_ONLY=0
+INCLUDE_PATCHES=()
+EXCLUDE_PATCHES=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --patches-only) PATCHES_ONLY=1; shift ;;
+        --apply-only)   APPLY_ONLY=1; shift ;;
+        --include)      INCLUDE_PATCHES+=("$2"); shift 2 ;;
+        --exclude)      EXCLUDE_PATCHES+=("$2"); shift 2 ;;
+        -*)             log_err "Unknown option: $1"; exit 1 ;;
+        *)
+            if [[ -z "$APP_NAME" ]]; then
+                APP_NAME="$1"
+            else
+                log_err "Unexpected argument: $1"
+                exit 1
+            fi
+            shift ;;
+    esac
+done
+
+if [[ -z "$APP_NAME" ]]; then
+    echo "Usage: $0 <app-name> [--patches-only] [--apply-only] [--include \"name\"] [--exclude \"name\"]"
+    exit 1
+fi
+
+CLI_JAR="${TOOLS_DIR}/revanced-cli.jar"
+APK_DIR="${WORKSPACE_DIR}/${APP_NAME}/apk"
+RVP_FILE="${PATCHES_DIR}/patches/build/libs/patches-1.0.0-dev.1.rvp"
+
+# ── Step 1: Build patches (.rvp) ──
+if [[ $APPLY_ONLY -eq 0 ]]; then
+    log_info "Building patches project..."
+
+    if [[ ! -f "${PATCHES_DIR}/gradlew" ]]; then
+        log_err "Patches project not found at ${PATCHES_DIR}"
+        log_err "Run the initial setup first (clone revanced-patches-template)."
+        exit 1
+    fi
+
+    cd "${PATCHES_DIR}"
+    ./gradlew build -x test
+    cd "${PROJECT_ROOT}"
+
+    # Find the built .rvp file
+    RVP_CANDIDATES=("${PATCHES_DIR}"/patches/build/libs/*.rvp)
+    if [[ ${#RVP_CANDIDATES[@]} -eq 0 || ! -f "${RVP_CANDIDATES[0]}" ]]; then
+        log_err "No .rvp file found after build. Check Gradle output for errors."
+        exit 1
+    fi
+    RVP_FILE="${RVP_CANDIDATES[0]}"
+    log_ok "Patches built: ${RVP_FILE}"
+
+    if [[ $PATCHES_ONLY -eq 1 ]]; then
+        log_ok "Done (--patches-only). RVP file: ${RVP_FILE}"
+        exit 0
+    fi
+fi
+
+# ── Step 2: Find the APK ──
+if [[ ! -d "$APK_DIR" ]]; then
+    log_err "APK directory not found: ${APK_DIR}"
+    log_err "Place your APK in ${APK_DIR}/ or run: ./scripts/pull-apk.sh <package> ${APP_NAME}"
+    exit 1
+fi
+
+# Find the most recent APK in the directory
+APK_FILE=$(find "$APK_DIR" -maxdepth 1 -name "*.apk" -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)
+if [[ -z "$APK_FILE" || ! -f "$APK_FILE" ]]; then
+    log_err "No APK found in ${APK_DIR}/"
+    exit 1
+fi
+log_info "Using APK: ${APK_FILE}"
+
+# ── Step 3: Apply patches ──
+if [[ ! -f "$CLI_JAR" ]]; then
+    log_err "ReVanced CLI not found. Run ./scripts/setup-tools.sh first."
+    exit 1
+fi
+
+ensure_dir "${OUTPUT_DIR}"
+OUTPUT_APK="${OUTPUT_DIR}/${APP_NAME}-patched.apk"
+
+# Build CLI arguments
+CLI_ARGS=(
+    patch
+    -bp "${RVP_FILE}"
+)
+
+# Add include/exclude filters
+if [[ ${#INCLUDE_PATCHES[@]} -gt 0 ]]; then
+    CLI_ARGS+=(--exclusive)
+    for p in "${INCLUDE_PATCHES[@]}"; do
+        CLI_ARGS+=(-e "$p")
+    done
+fi
+for p in "${EXCLUDE_PATCHES[@]}"; do
+    CLI_ARGS+=(-d "$p")
+done
+
+CLI_ARGS+=("${APK_FILE}")
+
+log_info "Applying patches with ReVanced CLI..."
+java -jar "${CLI_JAR}" "${CLI_ARGS[@]}"
+
+# Find the output (CLI puts it next to input with a suffix)
+PATCHED_CANDIDATES=("${APK_DIR}"/*-patched.apk "${APK_DIR}"/*-patched-aligned-debugSigned.apk)
+PATCHED_FILE=""
+for f in "${PATCHED_CANDIDATES[@]}"; do
+    if [[ -f "$f" ]]; then
+        PATCHED_FILE="$f"
+        break
+    fi
+done
+
+if [[ -z "$PATCHED_FILE" ]]; then
+    # Check in current directory too
+    for f in ./*-patched*.apk; do
+        if [[ -f "$f" ]]; then
+            PATCHED_FILE="$f"
+            break
+        fi
+    done
+fi
+
+if [[ -n "$PATCHED_FILE" ]]; then
+    mv "$PATCHED_FILE" "$OUTPUT_APK"
+    log_ok "Patched APK: ${OUTPUT_APK}"
+else
+    log_warn "Could not locate patched APK output. Check CLI output above."
+    log_info "The patched APK may be next to the input APK or in the current directory."
+fi
+
+echo ""
+log_info "Next step: ./scripts/install.sh ${OUTPUT_APK}"

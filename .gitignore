@@ -1,0 +1,40 @@
+# Tools (downloaded by scripts/setup-tools.sh)
+tools/
+
+# Decompiled app source (large, regenerable)
+workspace/*/decompiled/
+
+# Original APKs
+workspace/*/apk/
+
+# Patched output
+output/
+
+# Gradle
+.gradle/
+build/
+patches/.gradle/
+patches/build/
+patches/patches/build/
+patches/extensions/*/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+!.vscode/extensions.json
+
+# Environment and credentials (may contain GitHub PAT)
+.env
+patches/gradle.properties
+patches/local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Signing keys
+*.keystore
+*.jks
+*.pk8
+*.pem
