@@ -2,6 +2,8 @@ package app.revanced.patches.instagram
 
 import app.revanced.patcher.accessFlags
 import app.revanced.patcher.composingFirstMethod
+import app.revanced.patcher.instructions
+import app.revanced.patcher.literal
 import app.revanced.patcher.parameterTypes
 import app.revanced.patcher.patch.BytecodePatchContext
 import app.revanced.patcher.returnType
@@ -32,6 +34,27 @@ internal val BytecodePatchContext.fetchSponsoredContentMatch by composingFirstMe
 ) {
     accessFlags(AccessFlags.PUBLIC, AccessFlags.FINAL)
     returnType("V")
+}
+
+/**
+ * Matches SponsoredContentControllerV2's insertion helper — the V2 equivalent
+ * of insertItem. Instagram switches to V2 when mobile config flag
+ * 36332197803747956L is enabled (C98353nD.java:672). On first launch the
+ * flag isn't cached yet so V1 is used, but after config sync + restart the
+ * app uses V2 and bypasses Patch 1.
+ *
+ * Matched structurally: public static final boolean with 3 object params,
+ * containing the mobile config literal 36325798302995596L (shared with V1
+ * but unique in combination with the static+3-param signature).
+ * Decompiled ref: p000X/C161926Ia.java:123
+ */
+internal val BytecodePatchContext.adInjectorV2Match by composingFirstMethod {
+    accessFlags(AccessFlags.PUBLIC, AccessFlags.STATIC, AccessFlags.FINAL)
+    returnType("Z")
+    parameterTypes("L", "L", "L")
+    instructions(
+        literal(36325798302995596L),
+    )
 }
 
 // Note: a DqI() ad classifier patch (AbstractC144325fA.A00) was considered

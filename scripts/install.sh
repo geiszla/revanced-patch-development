@@ -82,12 +82,17 @@ if [[ -n "$APP_NAME" ]]; then
 fi
 
 if [[ $DOWNGRADE -eq 1 ]]; then
-    # Get package name to uninstall
-    PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*" | \
-        grep -i "$(echo "${APP_NAME:-patched}" | cut -c1-5)" | head -1 || true)
+    # Get package name from the APK itself
+    PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*${APP_NAME}.*" | head -1 || true)
+    if [[ -z "$PACKAGE" ]]; then
+        # Fallback: extract from AndroidManifest via aapt2 or apktool
+        PACKAGE=$(${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2 dump packagename "$APK_PATH" 2>/dev/null || true)
+    fi
     if [[ -n "$PACKAGE" ]]; then
         log_info "Uninstalling ${PACKAGE} (--downgrade)..."
         adb uninstall "$PACKAGE" 2>/dev/null || log_warn "Uninstall failed or app not installed"
+    else
+        log_warn "Could not determine package name. Uninstall manually if needed."
     fi
 fi
 
@@ -147,11 +152,9 @@ else
 fi
 
 if [[ $LAUNCH -eq 1 && -n "$APP_NAME" ]]; then
-    # Try to find and launch the package
-    PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*" | \
-        grep -i "$(echo "$APP_NAME" | cut -c1-5)" | head -1 || true)
-    if [[ -n "$PACKAGE" ]]; then
-        log_info "Launching ${PACKAGE}..."
-        adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 2>/dev/null
+    LAUNCH_PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*${APP_NAME}.*" | head -1 || true)
+    if [[ -n "$LAUNCH_PACKAGE" ]]; then
+        log_info "Launching ${LAUNCH_PACKAGE}..."
+        adb shell monkey -p "$LAUNCH_PACKAGE" -c android.intent.category.LAUNCHER 1 2>/dev/null
     fi
 fi
