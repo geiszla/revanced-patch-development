@@ -23,7 +23,7 @@ See [docs/setup-guide.md](docs/setup-guide.md) for detailed setup instructions.
 #    gpr.user=<username>  gpr.key=<token>
 #    githubPackagesUsername=<username>  githubPackagesPassword=<token>
 
-# 2. Download tools (JADX, APKTool, ReVanced CLI, Android SDK)
+# 2. Download tools (JADX, APKTool, ReVanced CLI, APKEditor, Android SDK)
 ./scripts/setup-tools.sh
 
 # 3. Verify the patches project builds
@@ -45,11 +45,14 @@ adb connect <IP>:<CONNECTION_PORT>
 
 # Write patches in patches/patches/src/main/kotlin/app/revanced/patches/instagram/
 
-# Build patches and apply to APK
+# Build patches and apply to APK (output includes app version in filename)
 ./scripts/build.sh instagram
 
-# Install on device
-./scripts/install.sh output/instagram-patched.apk
+# Install on device (automatically includes split APKs and re-signs everything)
+./scripts/install.sh output/instagram-<version>-patched.apk
+
+# Package as a single universal APK for sharing
+./scripts/package.sh instagram
 ```
 
 ## Project Structure
@@ -61,7 +64,7 @@ patches/                    Kotlin/Gradle patches project
   gradle/libs.versions.toml Patcher + Smali version catalog
 
 workspace/<app>/            Per-app working directories
-  apk/                      Original APK files
+  apk/                      Original APK files (base + splits)
   decompiled/jadx/          JADX output (readable Java source + resources)
   decompiled/apktool/       APKTool output (Smali + decoded resources)
 
@@ -70,8 +73,9 @@ scripts/
   setup-tools.sh            Download/update tools, sync Gradle versions
   decompile.sh              Decompile APK with JADX + APKTool
   build.sh                  Build patches and apply to APK
-  install.sh                Install patched APK on device
+  install.sh                Install patched APK on device (handles split APKs)
   pull-apk.sh               Pull installed APK from device
+  package.sh                Merge patched + splits into a single universal APK
 
 tools/                      Downloaded tools (gitignored)
 output/                     Patched APK output (gitignored)
@@ -90,7 +94,7 @@ All versions are centralized in [`scripts/config.sh`](scripts/config.sh):
 cd patches && ./gradlew build
 ```
 
-Tool versions (JADX, CLI, APKTool, Android SDK) and Gradle dependency versions (patcher, plugin, smali) are all managed from this single file.
+Tool versions (JADX, CLI, APKTool, APKEditor, Android SDK) and Gradle dependency versions (Gradle wrapper, patcher, plugin, smali) are all managed from this single file.
 
 ## Writing Patches
 
@@ -98,7 +102,7 @@ Patches use the `bytecodePatch {}` Kotlin DSL with `composingFirstMethod` for lo
 methods in obfuscated code:
 
 ```kotlin
-// Matching.kt — match declarations
+// Matching.kt -- match declarations
 import app.revanced.patcher.composingFirstMethod
 import app.revanced.patcher.patch.BytecodePatchContext
 import com.android.tools.smali.dexlib2.AccessFlags
@@ -112,7 +116,7 @@ internal val BytecodePatchContext.myMatch by composingFirstMethod(
     returnType("V")
 }
 
-// MyPatch.kt — patch logic
+// MyPatch.kt -- patch logic
 import app.revanced.patcher.extensions.addInstructions
 import app.revanced.patcher.patch.bytecodePatch
 

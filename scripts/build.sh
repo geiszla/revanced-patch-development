@@ -101,7 +101,9 @@ if [[ ! -f "$CLI_JAR" ]]; then
 fi
 
 ensure_dir "${OUTPUT_DIR}"
-OUTPUT_APK="${OUTPUT_DIR}/${APP_NAME}-patched.apk"
+APP_VERSION=$(get_apk_version "$APK_FILE")
+OUTPUT_APK="${OUTPUT_DIR}/${APP_NAME}-${APP_VERSION}-patched.apk"
+log_info "App version: ${APP_VERSION}"
 
 # Build CLI arguments
 CLI_ARGS=(

@@ -43,9 +43,11 @@ if [[ -z "$APK_PATH" ]]; then
     exit 1
 fi
 
-# Derive app name from filename (e.g., instagram-patched.apk → instagram)
+# Derive app name from filename
+# e.g., instagram-422.0.0.44.64-patched.apk → instagram
+# e.g., instagram-patched.apk → instagram
 if [[ -z "$APP_NAME" ]]; then
-    APP_NAME=$(basename "$APK_PATH" | sed -E 's/-patched.*\.apk$//')
+    APP_NAME=$(basename "$APK_PATH" | sed -E 's/-[0-9]+\..*//' | sed -E 's/-patched.*\.apk$//')
 fi
 
 if [[ ! -f "$APK_PATH" ]]; then

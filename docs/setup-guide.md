@@ -94,6 +94,7 @@ to obfuscation.
 | **APKTool** | Decode APK resources, disassemble to Smali |
 | **ReVanced CLI** | Apply patches to APKs |
 | **uber-apk-signer** | Sign patched APKs (required for installation) |
+| **APKEditor** | Merge split APKs into a single universal APK for sharing |
 
 ### Hardware
 
@@ -238,9 +239,9 @@ cd /home/andrewg/repos/revanced-development
 ./scripts/setup-tools.sh
 ```
 
-This downloads JADX, APKTool, ReVanced CLI, uber-apk-signer, and the Android SDK
-(command-line tools, platform, build-tools) into `tools/`. It also syncs Gradle
-dependency versions from `scripts/config.sh` into the patches project.
+This downloads JADX, APKTool, ReVanced CLI, uber-apk-signer, APKEditor, and the
+Android SDK (command-line tools, platform, build-tools) into `tools/`. It also syncs
+Gradle dependency versions from `scripts/config.sh` into the patches project.
 
 ### 6. Set Up Patches Project
 
@@ -565,13 +566,30 @@ Edit files in `patches/patches/src/main/kotlin/app/revanced/patches/<appname>/`.
 ./scripts/build.sh instagram
 ```
 
-This builds your patches and applies them to the APK. Output: `output/instagram-patched.apk`
+This builds your patches and applies them to the APK. Output includes the app version
+in the filename: `output/instagram-<version>-patched.apk`
 
 ### 6. Install
 
 ```bash
-./scripts/install.sh output/instagram-patched.apk
+./scripts/install.sh output/instagram-<version>-patched.apk
 ```
+
+The install script automatically detects split APKs in `workspace/instagram/apk/`,
+re-signs everything with the same key, and installs them together.
+
+Use `--downgrade` to uninstall the existing app first (needed when signatures differ),
+and `--launch` to open the app after installing.
+
+### 7. Package for sharing (optional)
+
+```bash
+./scripts/package.sh instagram
+```
+
+Merges the patched base APK and all split APKs into a single universal APK
+(`output/instagram-<version>-patched-universal.apk`) that can be shared and installed
+directly without needing split APK installers.
 
 ---
 

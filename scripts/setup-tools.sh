@@ -93,6 +93,17 @@ else
 fi
 ln -sf "$(basename "$SIGNER_VERSIONED")" "${SIGNER_JAR}"
 
+# ── APKEditor ──
+APKEDITOR_JAR="${TOOLS_DIR}/APKEditor.jar"
+APKEDITOR_VERSIONED="${TOOLS_DIR}/APKEditor-${APKEDITOR_VERSION}.jar"
+if [[ -f "$APKEDITOR_VERSIONED" ]]; then
+    log_ok "APKEditor ${APKEDITOR_VERSION} already installed"
+else
+    rm -f "${TOOLS_DIR}"/APKEditor*.jar
+    download_if_missing "APKEditor ${APKEDITOR_VERSION}" "${APKEDITOR_URL}" "${APKEDITOR_VERSIONED}"
+fi
+ln -sf "$(basename "$APKEDITOR_VERSIONED")" "${APKEDITOR_JAR}"
+
 # ── Sync Gradle config files from config.sh versions ──
 log_info "Syncing Gradle dependency versions from config.sh..."
 
@@ -160,6 +171,7 @@ echo "  JADX:             ${JADX_VERSION}"
 echo "  ReVanced CLI:     ${REVANCED_CLI_VERSION}"
 echo "  APKTool:          ${APKTOOL_VERSION}"
 echo "  uber-apk-signer:  ${UBER_APK_SIGNER_VERSION}"
+echo "  APKEditor:        ${APKEDITOR_VERSION}"
 echo "  Android SDK:      compileSdk ${ANDROID_COMPILE_SDK}, build-tools ${ANDROID_BUILD_TOOLS}"
 echo ""
 log_info "=== Gradle dependency versions ==="

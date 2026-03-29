@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # ReVanced Patch Development Project
 
 ## What this project is
@@ -27,23 +31,24 @@ revanced-development/
     setup-tools.sh           # Download/update tools (reads versions from config.sh)
     decompile.sh             # Decompile APK with JADX + APKTool
     build.sh                 # Build patches and apply to APK
-    install.sh               # Install patched APK on device
+    install.sh               # Install patched APK on device (handles split APKs automatically)
     pull-apk.sh              # Pull APK from device
+    package.sh               # Merge patched + split APKs into a single universal APK
 ```
 
 ## Upgrading dependencies
 All tool and dependency versions are managed in `scripts/config.sh`. To upgrade:
-1. Edit versions in `scripts/config.sh` (JADX, CLI, APKTool, signer)
-2. Run `./scripts/setup-tools.sh` to re-download updated tools
-3. For Gradle dependencies (patcher, patches plugin), edit `patches/gradle/libs.versions.toml`
-4. Run `cd patches && ./gradlew build` to verify compatibility
+1. Edit versions in `scripts/config.sh` (JADX, CLI, APKTool, signer, APKEditor, Gradle, patcher, smali)
+2. Run `./scripts/setup-tools.sh` to re-download tools and sync Gradle config files
+3. Run `cd patches && ./gradlew build` to verify compatibility
 
 ## Key commands
-- `./scripts/setup-tools.sh` -- download/update JADX, ReVanced CLI, APKTool
+- `./scripts/setup-tools.sh` -- download/update all tools, sync Gradle dependency versions
 - `./scripts/pull-apk.sh <package> <app-name>` -- pull APK from device
 - `./scripts/decompile.sh <apk-path> <app-name>` -- decompile with JADX + APKTool
 - `./scripts/build.sh <app-name>` -- build patches and apply to APK
-- `./scripts/install.sh <apk-path>` -- install patched APK on device
+- `./scripts/install.sh <apk-path>` -- install patched APK on device (auto-includes split APKs, re-signs all)
+- `./scripts/package.sh <app-name>` -- merge patched + splits into a single universal APK for sharing
 
 ## How patches work
 Patches use the `bytecodePatch {}` Kotlin DSL. They find target methods using
@@ -64,7 +69,7 @@ See `docs/setup-guide.md` for detailed examples.
 - For simple disable: use `returnEarly()` / `returnEarly(false)` utilities (see revanced-patches for examples)
 - For runtime logic, add extension code in `extensions/extension/src/main/java/`
 - Reference extensions in Smali as `Lapp/revanced/extension/instagram/ClassName;`
-- Test patches by running `./scripts/build.sh <app> && ./scripts/install.sh output/<app>-patched.apk`
+- Test patches by running `./scripts/build.sh <app> && ./scripts/install.sh output/<app>-<version>-patched.apk`
 - Convention: one `Matching.kt` + one `SomePatch.kt` per feature directory
 
 ## When analyzing decompiled code

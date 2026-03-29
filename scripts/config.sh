@@ -14,12 +14,14 @@ JADX_VERSION="1.5.5"
 REVANCED_CLI_VERSION="6.0.0"
 APKTOOL_VERSION="3.0.1"
 UBER_APK_SIGNER_VERSION="1.3.0"
+APKEDITOR_VERSION="1.4.8"
 
 # ── Download URLs (derived from versions) ──
 JADX_URL="https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip"
 REVANCED_CLI_URL="https://github.com/ReVanced/revanced-cli/releases/download/v${REVANCED_CLI_VERSION}/revanced-cli-${REVANCED_CLI_VERSION}-all.jar"
 APKTOOL_URL="https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar"
 UBER_APK_SIGNER_URL="https://github.com/patrickfav/uber-apk-signer/releases/download/v${UBER_APK_SIGNER_VERSION}/uber-apk-signer-${UBER_APK_SIGNER_VERSION}.jar"
+APKEDITOR_URL="https://github.com/REAndroid/APKEditor/releases/download/V${APKEDITOR_VERSION}/APKEditor-${APKEDITOR_VERSION}.jar"
 
 # ── Android SDK ──
 ANDROID_SDK_DIR="${PROJECT_ROOT}/tools/android-sdk"
@@ -62,4 +64,15 @@ check_tool() {
 
 ensure_dir() {
     mkdir -p "$1"
+}
+
+# Extract versionName from an APK using aapt2
+get_apk_version() {
+    local apk="$1"
+    local aapt2="${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+    if [[ -f "$aapt2" ]]; then
+        "$aapt2" dump badging "$apk" 2>/dev/null | grep -oP "versionName='\K[^']+" || echo "unknown"
+    else
+        echo "unknown"
+    fi
 }
