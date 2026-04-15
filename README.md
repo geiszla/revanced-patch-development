@@ -37,8 +37,10 @@ adb connect <IP>:<CONNECTION_PORT>
 ### Development Workflow
 
 ```bash
-# Pull APK from device
+# Pull APK from device…
 ./scripts/pull-apk.sh com.instagram.android instagram
+# …or import a manually-downloaded .apk/.apkm/.xapk/.apks (bundles auto-extracted)
+./scripts/pull-apk.sh --file ~/Downloads/instagram.apkm instagram
 
 # Decompile (JADX for readable Java, APKTool for resources/Smali)
 ./scripts/decompile.sh workspace/instagram/apk/base.apk instagram
@@ -74,7 +76,7 @@ scripts/
   decompile.sh              Decompile APK with JADX + APKTool
   build.sh                  Build patches and apply to APK
   install.sh                Install patched APK on device (handles split APKs)
-  pull-apk.sh               Pull installed APK from device
+  pull-apk.sh               Pull installed APK from device, or import a local .apk/.apkm/.xapk/.apks
   package.sh                Merge patched + splits into a single universal APK
 
 tools/                      Downloaded tools (gitignored)

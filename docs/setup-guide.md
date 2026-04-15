@@ -534,12 +534,27 @@ patches/src/main/kotlin/app/revanced/patches/instagram/
 ### 1. Get the APK
 
 ```bash
-# Pull from device (if app is installed)
+# Option A — pull from device (if the app is installed)
 ./scripts/pull-apk.sh com.instagram.android instagram
 
-# Or manually place an APK in:
-# workspace/instagram/apk/
+# Option B — import a manually-downloaded file
+# Supports .apk, .apkm (APKMirror), .xapk (APKPure), .apks.
+# Bundle formats are auto-extracted into workspace/<app>/apk/ and split naming is
+# normalized to split_*.apk so install.sh / package.sh pick them up unchanged.
+# The primary APK is placed at workspace/<app>/apk/base.apk (identified via aapt2
+# when the bundle doesn't already name it that).
+./scripts/pull-apk.sh --file ~/Downloads/instagram.apkm instagram
+
+# Option C — drop files manually into workspace/<app>/apk/
 ```
+
+By default the script refuses to run if `workspace/<app>/apk/` already contains APK
+files (to avoid mixing versions). Pass `--force` to overwrite.
+
+> **Note on "universal" bundles**: a device pull only captures the splits installed
+> on *that* device (ABI, density, language) and so isn't truly universal. APKMirror's
+> complete bundle (.apkm) and APKPure's .xapk typically include all architectures
+> and densities, which makes `--file` the better source for a portable patched APK.
 
 ### 2. Decompile
 

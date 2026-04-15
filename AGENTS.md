@@ -45,6 +45,7 @@ All tool and dependency versions are managed in `scripts/config.sh`. To upgrade:
 ## Key commands
 - `./scripts/setup-tools.sh` -- download/update all tools, sync Gradle dependency versions
 - `./scripts/pull-apk.sh <package> <app-name>` -- pull APK from device
+- `./scripts/pull-apk.sh --file <path> <app-name>` -- import a local .apk/.apkm/.xapk/.apks (bundles auto-extracted, split naming normalized). Add `--force` to overwrite existing APKs in the target dir
 - `./scripts/decompile.sh <apk-path> <app-name>` -- decompile with JADX + APKTool
 - `./scripts/build.sh <app-name>` -- build patches and apply to APK
 - `./scripts/install.sh <apk-path>` -- install patched APK on device (auto-includes split APKs, re-signs all)
