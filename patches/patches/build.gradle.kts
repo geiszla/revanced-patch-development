@@ -2,7 +2,7 @@ group = "app.revanced"
 
 patches {
     about {
-        name = "Custom ReVanced Patches"
+        name = "ReVanced Patches (geiszla)"
         description = "Custom patches for Android apps"
         source = ""
         author = "andrewg"
