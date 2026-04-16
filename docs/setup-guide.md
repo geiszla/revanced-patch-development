@@ -235,7 +235,7 @@ by the plugin internally to resolve patcher dependencies.
 ### 5. Download Tools
 
 ```bash
-cd /home/andrewg/repos/revanced-development
+cd /home/andrewg/repos/revanced-patch-development
 ./scripts/setup-tools.sh
 ```
 
@@ -634,7 +634,7 @@ then update `patches/gradle.properties` with the new token from `gh auth token`.
 ### SDK location not found
 Run `./scripts/setup-tools.sh` to install the Android SDK. The script sets
 `ANDROID_HOME` automatically. If building outside the scripts, set it manually:
-`export ANDROID_HOME=/path/to/revanced-development/tools/android-sdk`
+`export ANDROID_HOME=/path/to/revanced-patch-development/tools/android-sdk`
 
 ### `adb connect` fails
 - Ensure phone and WSL are on the same WiFi network

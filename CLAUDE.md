@@ -13,7 +13,7 @@ ReVanced Patcher API.
 
 ## Directory structure
 ```
-revanced-development/
+revanced-patch-development/
   docs/setup-guide.md       # Comprehensive setup and reference guide
   patches/                  # Kotlin/Gradle patches project (from revanced-patches-template)
     patches/src/main/kotlin/app/revanced/patches/
