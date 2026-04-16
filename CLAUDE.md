@@ -5,8 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # ReVanced Patch Development Project
 
 ## What this project is
-A development environment for writing custom ReVanced patches for Android apps,
-starting with Instagram. Patches are written in Kotlin using the ReVanced Patcher API.
+A development environment for writing custom ReVanced patches for Android apps.
+Supports any number of target apps in parallel — each app is isolated under its
+own subdirectory in `patches/`, `extensions/`, and `workspace/`. Instagram is
+included as the first worked example. Patches are written in Kotlin using the
+ReVanced Patcher API.
 
 ## Directory structure
 ```
@@ -14,9 +17,11 @@ revanced-development/
   docs/setup-guide.md       # Comprehensive setup and reference guide
   patches/                  # Kotlin/Gradle patches project (from revanced-patches-template)
     patches/src/main/kotlin/app/revanced/patches/
-      instagram/            # Instagram patches
-      <other-app>/          # Future app patches go in new subdirectories
-    extensions/extension/   # Runtime code compiled to DEX, merged into target apps
+      instagram/            # Instagram patches (example)
+      <other-app>/          # Additional apps go in new subdirectories
+    extensions/extension/src/main/java/app/revanced/extension/
+      instagram/            # Instagram runtime extension classes (example)
+      <other-app>/          # Additional apps get their own subpackage
     settings.gradle.kts     # Applies revanced patches gradle plugin
     gradle.properties       # GitHub Packages auth (gpr.user, gpr.key)
     gradle/libs.versions.toml  # Patcher + plugin version catalog
@@ -29,10 +34,10 @@ revanced-development/
   scripts/
     config.sh               # Central version config for ALL tools and dependencies
     setup-tools.sh           # Download/update tools (reads versions from config.sh)
+    add-app.sh               # Scaffold a new app and pull/import its APK
     decompile.sh             # Decompile APK with JADX + APKTool
     build.sh                 # Build patches and apply to APK
     install.sh               # Install patched APK on device (handles split APKs automatically)
-    pull-apk.sh              # Pull APK from device
     package.sh               # Merge patched + split APKs into a single universal APK
 ```
 
@@ -44,11 +49,11 @@ All tool and dependency versions are managed in `scripts/config.sh`. To upgrade:
 
 ## Key commands
 - `./scripts/setup-tools.sh` -- download/update all tools, sync Gradle dependency versions
-- `./scripts/pull-apk.sh <package> <app-name>` -- pull APK from device
-- `./scripts/pull-apk.sh --file <path> <app-name>` -- import a local .apk/.apkm/.xapk/.apks (bundles auto-extracted, split naming normalized). Add `--force` to overwrite existing APKs in the target dir
+- `./scripts/add-app.sh <package> <app-name>` -- scaffold a new app (creates `patches/<app>/`, `extensions/<app>/`, `workspace/<app>/apk/`) and pull its APK from the connected device. Re-running with `--force` refreshes the APK; existing patches/extensions directories are preserved
+- `./scripts/add-app.sh --file <path> <app-name>` -- same as above but imports a local .apk/.apkm/.xapk/.apks (bundles auto-extracted, split naming normalized). Package name is auto-detected from the imported APK via aapt2
 - `./scripts/decompile.sh <apk-path> <app-name>` -- decompile with JADX + APKTool
-- `./scripts/build.sh <app-name>` -- build patches and apply to APK
-- `./scripts/install.sh <apk-path>` -- install patched APK on device (auto-includes split APKs, re-signs all)
+- `./scripts/build.sh <app-name>` -- build all patches in the project and apply the compatible ones to the app's APK. The `.rvp` bundle contains patches for every app; the CLI filters by each patch's `compatibleWith(...)` declaration, so only patches matching the target APK's package are applied
+- `./scripts/install.sh <apk-path>` -- install patched APK on device (auto-includes split APKs, re-signs all). Package name for `--downgrade`/`--launch` is read from the APK via aapt2
 - `./scripts/package.sh <app-name>` -- merge patched + splits into a single universal APK for sharing
 
 ## How patches work
@@ -69,7 +74,8 @@ See `docs/setup-guide.md` for detailed examples.
 - Required imports for patches: `app.revanced.patcher.patch.bytecodePatch`, `app.revanced.patcher.extensions.addInstructions`
 - For simple disable: use `returnEarly()` / `returnEarly(false)` utilities (see revanced-patches for examples)
 - For runtime logic, add extension code in `extensions/extension/src/main/java/`
-- Reference extensions in Smali as `Lapp/revanced/extension/instagram/ClassName;`
+- Reference extensions in Smali as `Lapp/revanced/extension/<app>/ClassName;` (e.g., `Lapp/revanced/extension/instagram/AdFilter;`)
+- Each patch must declare `compatibleWith("<package-name>")` (e.g., `compatibleWith("com.instagram.android")`) so the CLI only applies it to the intended app
 - Test patches by running `./scripts/build.sh <app> && ./scripts/install.sh output/<app>-<version>-patched.apk`
 - Convention: one `Matching.kt` + one `SomePatch.kt` per feature directory
 - Don't reference obfuscated identifiers (obfuscated class names like `C6KD`, method names like `A02`/`Dvu`, field refs like `c231558wZ.A03`), mobile-config long literals, or decompiled line numbers in code comments or doc blocks. Use semantic descriptions instead ("the V2 insertion helper", "the prefetch trigger"), plus Java framework types (`System.currentTimeMillis`, `Collections.singleton`) and stable in-binary strings (systrace labels, endpoint paths, debug-log strings) that actually appear at the match anchors

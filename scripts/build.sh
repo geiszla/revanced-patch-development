@@ -11,6 +11,11 @@ source "$(dirname "$0")/config.sh"
 #   ./scripts/build.sh instagram                          # Build + apply all compatible patches
 #   ./scripts/build.sh instagram --patches-only            # Only build the .rvp, don't apply
 #   ./scripts/build.sh instagram --include "Hide element"  # Only apply specific patch(es)
+#
+# The .rvp bundle contains patches for every app in the project. The CLI only
+# applies patches whose `compatibleWith(...)` matches the target APK's
+# package, so running this against a different app is safe — it just no-ops
+# the unrelated patches.
 
 APP_NAME=""
 PATCHES_ONLY=0
@@ -77,7 +82,7 @@ fi
 # ── Step 2: Find the APK ──
 if [[ ! -d "$APK_DIR" ]]; then
     log_err "APK directory not found: ${APK_DIR}"
-    log_err "Place your APK in ${APK_DIR}/ or run: ./scripts/pull-apk.sh <package> ${APP_NAME}"
+    log_err "Place your APK in ${APK_DIR}/ or run: ./scripts/add-app.sh <package> ${APP_NAME}"
     exit 1
 fi
 
@@ -93,6 +98,16 @@ if [[ -z "$APK_FILE" || ! -f "$APK_FILE" ]]; then
     exit 1
 fi
 log_info "Using APK: ${APK_FILE}"
+
+# Surface the target package so the user can see which patches the CLI's
+# compatibleWith filter will select from the bundled .rvp.
+AAPT2="${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+if [[ -x "$AAPT2" ]]; then
+    APK_PACKAGE=$("$AAPT2" dump packagename "$APK_FILE" 2>/dev/null || true)
+    if [[ -n "$APK_PACKAGE" ]]; then
+        log_info "Target package: ${APK_PACKAGE} (only patches with compatibleWith(\"${APK_PACKAGE}\") apply)"
+    fi
+fi
 
 # ── Step 3: Apply patches ──
 if [[ ! -f "$CLI_JAR" ]]; then

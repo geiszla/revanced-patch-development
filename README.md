@@ -2,7 +2,7 @@
 
 A development environment for writing custom [ReVanced](https://revanced.app/) patches for Android apps. Patches are written in Kotlin using the ReVanced Patcher API and applied to APKs via the ReVanced CLI.
 
-Currently targeting **Instagram**, with support for adding other apps.
+Supports patch development for any number of apps in parallel — each app lives in its own subdirectory under `patches/`, `extensions/`, and `workspace/`. Instagram is included as the first worked example.
 
 ## Quick Start
 
@@ -37,10 +37,11 @@ adb connect <IP>:<CONNECTION_PORT>
 ### Development Workflow
 
 ```bash
-# Pull APK from device…
-./scripts/pull-apk.sh com.instagram.android instagram
+# Add a new app — pulls APK from device and scaffolds the patches/extensions
+# directories for the app. Also used to refresh the APK with --force.
+./scripts/add-app.sh com.instagram.android instagram
 # …or import a manually-downloaded .apk/.apkm/.xapk/.apks (bundles auto-extracted)
-./scripts/pull-apk.sh --file ~/Downloads/instagram.apkm instagram
+./scripts/add-app.sh --file ~/Downloads/instagram.apkm instagram
 
 # Decompile (JADX for readable Java, APKTool for resources/Smali)
 ./scripts/decompile.sh workspace/instagram/apk/base.apk instagram
@@ -56,6 +57,8 @@ adb connect <IP>:<CONNECTION_PORT>
 # Package as a single universal APK for sharing
 ./scripts/package.sh instagram
 ```
+
+To start a second app, run `./scripts/add-app.sh <package> <app-name>` with a new `<app-name>`. It creates the patches/extensions subdirectories alongside the existing ones — the rest of the workflow is identical.
 
 ## Project Structure
 
@@ -73,10 +76,10 @@ workspace/<app>/            Per-app working directories
 scripts/
   config.sh                 Central version config for all tools and dependencies
   setup-tools.sh            Download/update tools, sync Gradle versions
+  add-app.sh                Scaffold a new app and pull/import its APK (.apk/.apkm/.xapk/.apks)
   decompile.sh              Decompile APK with JADX + APKTool
   build.sh                  Build patches and apply to APK
   install.sh                Install patched APK on device (handles split APKs)
-  pull-apk.sh               Pull installed APK from device, or import a local .apk/.apkm/.xapk/.apks
   package.sh                Merge patched + splits into a single universal APK
 
 tools/                      Downloaded tools (gitignored)

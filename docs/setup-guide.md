@@ -531,22 +531,39 @@ patches/src/main/kotlin/app/revanced/patches/instagram/
 
 ## Development Workflow
 
-### 1. Get the APK
+### 1. Add the app and get the APK
+
+`add-app.sh` scaffolds the patches/extensions directories for a new app and
+pulls or imports its APK in one step. Re-run it (with `--force`) to refresh
+the APK for an existing app — the patches/extensions directories are
+preserved. The `<app-name>` you choose here is used as the Kotlin package
+segment (`app.revanced.patches.<app-name>`), so it must be lowercase
+alphanumeric (underscores allowed).
 
 ```bash
 # Option A — pull from device (if the app is installed)
-./scripts/pull-apk.sh com.instagram.android instagram
+./scripts/add-app.sh com.instagram.android instagram
 
 # Option B — import a manually-downloaded file
 # Supports .apk, .apkm (APKMirror), .xapk (APKPure), .apks.
 # Bundle formats are auto-extracted into workspace/<app>/apk/ and split naming is
 # normalized to split_*.apk so install.sh / package.sh pick them up unchanged.
 # The primary APK is placed at workspace/<app>/apk/base.apk (identified via aapt2
-# when the bundle doesn't already name it that).
-./scripts/pull-apk.sh --file ~/Downloads/instagram.apkm instagram
+# when the bundle doesn't already name it that). Package name is auto-detected
+# from the imported APK so add-app.sh can still tell you which compatibleWith
+# value to use.
+./scripts/add-app.sh --file ~/Downloads/instagram.apkm instagram
 
-# Option C — drop files manually into workspace/<app>/apk/
+# Option C — drop files manually into workspace/<app>/apk/, then re-run
+# add-app.sh with --force to trigger scaffolding (or create the directories
+# yourself under patches/.../patches/<app>/ and extensions/.../extension/<app>/)
 ```
+
+After this runs, the app's patches directory exists at
+`patches/patches/src/main/kotlin/app/revanced/patches/<app-name>/` with a
+minimal `Matching.kt` (package declaration only). The same pattern applies to
+any new app: pick a short lowercase name, run `add-app.sh`, then start
+writing patches alongside Instagram's.
 
 By default the script refuses to run if `workspace/<app>/apk/` already contains APK
 files (to avoid mixing versions). Pass `--force` to overwrite.

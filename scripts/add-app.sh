@@ -2,20 +2,27 @@
 set -euo pipefail
 source "$(dirname "$0")/config.sh"
 
-# Pull an APK from a connected Android device, or import one from a local file.
+# Add a new target app (or refresh the APK for an existing one).
+#
+# Pulls the APK from a connected Android device, or imports one from a local
+# file, then scaffolds the patches/extensions directories for the app when
+# they don't already exist.
 #
 # Usage:
 #   From device:
-#     ./scripts/pull-apk.sh <package-name> <app-name>
-#     ./scripts/pull-apk.sh com.instagram.android instagram
+#     ./scripts/add-app.sh <package-name> <app-name>
+#     ./scripts/add-app.sh com.instagram.android instagram
 #
 #   From a file (supports .apk, .apkm [APKMirror], .xapk [APKPure], .apks):
-#     ./scripts/pull-apk.sh --file <path> <app-name>
-#     ./scripts/pull-apk.sh --file ~/Downloads/instagram.apkm instagram
+#     ./scripts/add-app.sh --file <path> <app-name>
+#     ./scripts/add-app.sh --file ~/Downloads/instagram.apkm instagram
 #
 # Bundle formats (.apkm/.xapk/.apks) are auto-extracted into the app's apk/
 # directory and split naming is normalized to split_*.apk so the rest of the
 # toolchain (install.sh, package.sh) picks them up unchanged.
+#
+# Re-running this on an existing app (with --force) pulls a fresh APK but
+# leaves the existing patches/extensions directories untouched.
 #
 # APKs are saved to workspace/<app-name>/apk/.
 
@@ -70,6 +77,15 @@ else
         echo "  $0 --file ~/Downloads/instagram.apkm instagram"
         exit 1
     fi
+fi
+
+# App name is used as a Kotlin/Java package segment, so it must be a valid
+# identifier.
+if [[ ! "$APP_NAME" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    log_err "Invalid app name: ${APP_NAME}"
+    log_err "Must be lowercase alphanumeric (plus underscore) starting with a letter."
+    log_err "Used as a Kotlin/Java package segment."
+    exit 1
 fi
 
 OUT_DIR="${WORKSPACE_DIR}/${APP_NAME}/apk"
@@ -156,57 +172,86 @@ if [[ -n "$FILE" ]]; then
         log_info "Bundle has ${SPLITS} split APK(s). Patch base.apk; install.sh includes splits automatically."
     fi
 
-    echo ""
-    log_info "Next step: ./scripts/decompile.sh ${OUT_DIR}/base.apk ${APP_NAME}"
-    exit 0
+    # Extract package name from the imported APK so we can surface it in the
+    # scaffolding hints below.
+    AAPT2="${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+    if [[ -z "$PACKAGE" && -x "$AAPT2" && -f "${OUT_DIR}/base.apk" ]]; then
+        PACKAGE=$("$AAPT2" dump packagename "${OUT_DIR}/base.apk" 2>/dev/null || true)
+    fi
+else
+    # ───────────────────────────────────────────────────────────────────────
+    # Device pull mode
+    # ───────────────────────────────────────────────────────────────────────
+    if ! command -v adb &>/dev/null; then
+        log_err "ADB not found. Install with: sudo dnf install android-tools"
+        exit 1
+    fi
+
+    DEVICE_COUNT=$(adb devices | grep -c 'device$' || true)
+    if [[ $DEVICE_COUNT -eq 0 ]]; then
+        log_err "No device connected."
+        log_err "Connect via WiFi: adb pair <IP>:<PORT>, then adb connect <IP>:<PORT>"
+        exit 1
+    fi
+
+    log_info "Looking up APK paths for ${PACKAGE}..."
+    APK_PATHS=$(adb shell pm path "$PACKAGE" 2>/dev/null | sed 's/^package://')
+
+    if [[ -z "$APK_PATHS" ]]; then
+        log_err "Package not found on device: ${PACKAGE}"
+        log_info "Listing similar packages:"
+        adb shell pm list packages | grep -i "$(echo "$APP_NAME" | cut -c1-4)" || true
+        exit 1
+    fi
+
+    PULLED=0
+    while IFS= read -r apk_path; do
+        apk_path=$(echo "$apk_path" | tr -d '\r')
+        if [[ -z "$apk_path" ]]; then continue; fi
+
+        filename=$(basename "$apk_path")
+        dest="${OUT_DIR}/${filename}"
+
+        log_info "Pulling: ${apk_path}"
+        adb pull "$apk_path" "$dest"
+        PULLED=$((PULLED + 1))
+    done <<< "$APK_PATHS"
+
+    log_ok "Pulled ${PULLED} APK file(s) to ${OUT_DIR}/"
+    ls -lh "${OUT_DIR}"/*.apk
+
+    if [[ $PULLED -gt 1 ]]; then
+        log_info "This app uses split APKs. The base.apk is the main one."
+        log_info "For patching, use the base.apk: ${OUT_DIR}/base.apk"
+    fi
 fi
 
 # ───────────────────────────────────────────────────────────────────────────
-# Device pull mode
+# Scaffold patches + extensions directories (idempotent)
 # ───────────────────────────────────────────────────────────────────────────
+PATCHES_SRC="${PATCHES_DIR}/patches/src/main/kotlin/app/revanced/patches/${APP_NAME}"
+EXTENSION_SRC="${PATCHES_DIR}/extensions/extension/src/main/java/app/revanced/extension/${APP_NAME}"
 
-if ! command -v adb &>/dev/null; then
-    log_err "ADB not found. Install with: sudo dnf install android-tools"
-    exit 1
+if [[ ! -d "$PATCHES_SRC" ]]; then
+    log_info "Scaffolding patches directory: ${PATCHES_SRC}"
+    ensure_dir "$PATCHES_SRC"
+    cat > "${PATCHES_SRC}/Matching.kt" <<KOTLIN
+package app.revanced.patches.${APP_NAME}
+KOTLIN
 fi
 
-DEVICE_COUNT=$(adb devices | grep -c 'device$' || true)
-if [[ $DEVICE_COUNT -eq 0 ]]; then
-    log_err "No device connected."
-    log_err "Connect via WiFi: adb pair <IP>:<PORT>, then adb connect <IP>:<PORT>"
-    exit 1
-fi
-
-log_info "Looking up APK paths for ${PACKAGE}..."
-APK_PATHS=$(adb shell pm path "$PACKAGE" 2>/dev/null | sed 's/^package://')
-
-if [[ -z "$APK_PATHS" ]]; then
-    log_err "Package not found on device: ${PACKAGE}"
-    log_info "Listing similar packages:"
-    adb shell pm list packages | grep -i "$(echo "$APP_NAME" | cut -c1-4)" || true
-    exit 1
-fi
-
-PULLED=0
-while IFS= read -r apk_path; do
-    apk_path=$(echo "$apk_path" | tr -d '\r')
-    if [[ -z "$apk_path" ]]; then continue; fi
-
-    filename=$(basename "$apk_path")
-    dest="${OUT_DIR}/${filename}"
-
-    log_info "Pulling: ${apk_path}"
-    adb pull "$apk_path" "$dest"
-    PULLED=$((PULLED + 1))
-done <<< "$APK_PATHS"
-
-log_ok "Pulled ${PULLED} APK file(s) to ${OUT_DIR}/"
-ls -lh "${OUT_DIR}"/*.apk
-
-if [[ $PULLED -gt 1 ]]; then
-    log_info "This app uses split APKs. The base.apk is the main one."
-    log_info "For patching, use the base.apk: ${OUT_DIR}/base.apk"
+if [[ ! -d "$EXTENSION_SRC" ]]; then
+    log_info "Scaffolding extension directory: ${EXTENSION_SRC}"
+    ensure_dir "$EXTENSION_SRC"
 fi
 
 echo ""
-log_info "Next step: ./scripts/decompile.sh ${OUT_DIR}/base.apk ${APP_NAME}"
+log_ok "App ready: ${APP_NAME}${PACKAGE:+ (${PACKAGE})}"
+log_info "Next steps:"
+log_info "  1. Decompile: ./scripts/decompile.sh ${OUT_DIR}/base.apk ${APP_NAME}"
+log_info "  2. Write patches under: ${PATCHES_SRC}/"
+if [[ -n "$PACKAGE" ]]; then
+    log_info "       Declare compatibleWith(\"${PACKAGE}\") on each patch."
+fi
+log_info "  3. Build + apply: ./scripts/build.sh ${APP_NAME}"
+log_info "  4. Install:       ./scripts/install.sh output/${APP_NAME}-<version>-patched.apk"

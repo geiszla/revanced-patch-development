@@ -72,6 +72,14 @@ fi
 DEVICE_ID=$(adb devices | grep 'device$' | head -1 | awk '{print $1}')
 log_info "Device: ${DEVICE_ID}"
 
+# Extract the exact package name from the APK (authoritative source, unlike
+# matching against the short app name via `adb pm list`).
+AAPT2="${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
+PACKAGE=""
+if [[ -x "$AAPT2" ]]; then
+    PACKAGE=$("$AAPT2" dump packagename "$APK_PATH" 2>/dev/null || true)
+fi
+
 # Collect split APKs if app-name is provided
 SPLIT_APKS=()
 if [[ -n "$APP_NAME" ]]; then
@@ -84,17 +92,11 @@ if [[ -n "$APP_NAME" ]]; then
 fi
 
 if [[ $DOWNGRADE -eq 1 ]]; then
-    # Get package name from the APK itself
-    PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*${APP_NAME}.*" | head -1 || true)
-    if [[ -z "$PACKAGE" ]]; then
-        # Fallback: extract from AndroidManifest via aapt2 or apktool
-        PACKAGE=$(${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/aapt2 dump packagename "$APK_PATH" 2>/dev/null || true)
-    fi
     if [[ -n "$PACKAGE" ]]; then
         log_info "Uninstalling ${PACKAGE} (--downgrade)..."
         adb uninstall "$PACKAGE" 2>/dev/null || log_warn "Uninstall failed or app not installed"
     else
-        log_warn "Could not determine package name. Uninstall manually if needed."
+        log_warn "Could not determine package name (aapt2 unavailable). Uninstall manually if needed."
     fi
 fi
 
@@ -153,10 +155,11 @@ else
     fi
 fi
 
-if [[ $LAUNCH -eq 1 && -n "$APP_NAME" ]]; then
-    LAUNCH_PACKAGE=$(adb shell pm list packages 2>/dev/null | grep -oP "package:\K.*${APP_NAME}.*" | head -1 || true)
-    if [[ -n "$LAUNCH_PACKAGE" ]]; then
-        log_info "Launching ${LAUNCH_PACKAGE}..."
-        adb shell monkey -p "$LAUNCH_PACKAGE" -c android.intent.category.LAUNCHER 1 2>/dev/null
+if [[ $LAUNCH -eq 1 ]]; then
+    if [[ -n "$PACKAGE" ]]; then
+        log_info "Launching ${PACKAGE}..."
+        adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 2>/dev/null
+    else
+        log_warn "Could not determine package name (aapt2 unavailable). Launch manually."
     fi
 fi

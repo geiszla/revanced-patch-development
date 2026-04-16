@@ -161,7 +161,7 @@ if command -v adb &>/dev/null; then
     log_ok "ADB found: $(adb version | head -1)"
 else
     log_warn "ADB not installed. Install with: sudo dnf install android-tools"
-    log_warn "ADB is only needed for device interaction (pull-apk, install)."
+    log_warn "ADB is only needed for device interaction (add-app, install)."
 fi
 
 # ── Summary ──
