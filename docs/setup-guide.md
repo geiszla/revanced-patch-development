@@ -708,7 +708,7 @@ So users (and you) can verify signatures, commit your public key to the repo roo
 gpg --armor --export YOUR_KEY_ID > public-key.asc
 git add public-key.asc
 git commit -m "Add GPG public key for patch signing"
-git push origin master
+git push origin main
 ```
 
 ### 5. Create the `release` branch
