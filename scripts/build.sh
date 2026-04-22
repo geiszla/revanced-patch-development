@@ -48,7 +48,18 @@ fi
 
 CLI_JAR="${TOOLS_DIR}/revanced-cli.jar"
 APK_DIR="${WORKSPACE_DIR}/${APP_NAME}/apk"
-RVP_FILE="${PATCHES_DIR}/patches/build/libs/patches-1.0.0-dev.1.rvp"
+
+# Resolve the newest non-sources .rvp in build/libs/. The glob variant
+# previously used here picked the oldest bundle when a version bump left
+# stale files behind, and preferred *-sources.rvp (a sources jar) over
+# the real patches bundle because "-" sorts before "." in bash globs.
+find_patches_rvp() {
+    find "${PATCHES_DIR}/patches/build/libs" -maxdepth 1 -name "*.rvp" \
+        ! -name "*-sources.rvp" -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | cut -d' ' -f2-
+}
+
+RVP_FILE="$(find_patches_rvp)"
 
 # ── Step 1: Build patches (.rvp) ──
 if [[ $APPLY_ONLY -eq 0 ]]; then
@@ -64,13 +75,12 @@ if [[ $APPLY_ONLY -eq 0 ]]; then
     ./gradlew build -x test
     cd "${PROJECT_ROOT}"
 
-    # Find the built .rvp file
-    RVP_CANDIDATES=("${PATCHES_DIR}"/patches/build/libs/*.rvp)
-    if [[ ${#RVP_CANDIDATES[@]} -eq 0 || ! -f "${RVP_CANDIDATES[0]}" ]]; then
+    # Find the built .rvp file (newest main bundle, excluding -sources.rvp).
+    RVP_FILE="$(find_patches_rvp)"
+    if [[ -z "$RVP_FILE" || ! -f "$RVP_FILE" ]]; then
         log_err "No .rvp file found after build. Check Gradle output for errors."
         exit 1
     fi
-    RVP_FILE="${RVP_CANDIDATES[0]}"
     log_ok "Patches built: ${RVP_FILE}"
 
     if [[ $PATCHES_ONLY -eq 1 ]]; then
@@ -112,6 +122,12 @@ fi
 # ── Step 3: Apply patches ──
 if [[ ! -f "$CLI_JAR" ]]; then
     log_err "ReVanced CLI not found. Run ./scripts/setup-tools.sh first."
+    exit 1
+fi
+
+if [[ -z "$RVP_FILE" || ! -f "$RVP_FILE" ]]; then
+    log_err "No .rvp file found in ${PATCHES_DIR}/patches/build/libs/."
+    log_err "Run without --apply-only to build patches first."
     exit 1
 fi
 
